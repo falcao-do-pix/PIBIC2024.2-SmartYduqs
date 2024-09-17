@@ -1,5 +1,4 @@
 import cv2
-from pyzbar.pyzbar import decode
 from cryptography.fernet import Fernet
 import mysql.connector
 from mysql.connector import Error
@@ -25,11 +24,11 @@ def descriptografar_senha(senha_criptografada, chave):
     fernet = Fernet(chave)
     return fernet.decrypt(senha_criptografada).decode('utf-8')
 
-# Função para ler QR Code da imagem capturada
+# Função para ler QR Code da imagem capturada usando OpenCV
 def ler_qr_code(imagem):
-    qr_codes = decode(imagem)
-    for qr in qr_codes:
-        data = qr.data.decode('utf-8')
+    detector = cv2.QRCodeDetector()
+    data, bbox, _ = detector.detectAndDecode(imagem)
+    if bbox is not None:
         return data
     return None
 
@@ -46,9 +45,9 @@ def autenticar_aluno(dados_qr):
                 info = re.search(r'Matrícula: (\d+), Senha criptografada: (.+)', dados_qr)
                 if info:
                     matricula = int(info.group(1))  # Converter matrícula para inteiro
-                    senha_criptografada = info.group(2).encode()
+                    senha_criptografada_qr = info.group(2).encode()  # A senha do QR Code já vem como string, precisamos convertê-la para bytes
                     print(f"Matrícula extraída do QR Code: {matricula}")
-                    print(f"Senha criptografada extraída do QR Code: {senha_criptografada.decode()}")
+                    print(f"Senha criptografada extraída do QR Code: {senha_criptografada_qr.decode()}")
                 else:
                     print("Formato do QR Code inválido.")
                     return
@@ -64,13 +63,22 @@ def autenticar_aluno(dados_qr):
 
             if resultado:
                 senha_criptografada_banco, chave_criptografia_banco = resultado
-                chave_criptografia_banco = chave_criptografia_banco.encode()  # Convertendo para bytes
 
-                # Descriptografar a senha
+                # Se a senha for um número inteiro, converta-a para string e depois para bytes
+                if isinstance(senha_criptografada_banco, int):
+                    senha_criptografada_banco = str(senha_criptografada_banco).encode()  # Converter de int para bytes
+
+                # Verificar se a chave já está em bytes
+                if isinstance(chave_criptografia_banco, str):
+                    chave_criptografia_banco = chave_criptografia_banco.encode()  # Convertendo a chave para bytes apenas se for uma string
+
+                # Descriptografar a senha do banco de dados
                 try:
-                    senha_descriptografada = descriptografar_senha(senha_criptografada_banco, chave_criptografia_banco)
-                    print(f"Senha descriptografada: {senha_descriptografada}")
-                    if senha_criptografada_banco == senha_criptografada:
+                    senha_descriptografada_banco = descriptografar_senha(senha_criptografada_banco, chave_criptografia_banco)
+                    print(f"Senha descriptografada do banco de dados: {senha_descriptografada_banco}")
+
+                    # Comparar a senha descriptografada com a senha criptografada do QR Code
+                    if senha_criptografada_qr == senha_criptografada_banco:
                         print("Acesso liberado!")
                     else:
                         print("Acesso negado: senha não confere.")
@@ -83,6 +91,7 @@ def autenticar_aluno(dados_qr):
     except Exception as e:
         print(f"Erro ao autenticar: {e}")
 
+
 # Função principal para capturar e processar QR Code
 def main():
     # Configurar captura de vídeo da câmera
@@ -93,7 +102,7 @@ def main():
         if not ret:
             print("Não foi possível capturar imagem da câmera.")
             break
-        
+
         # Decodificar QR Code da imagem capturada
         dados_qr = ler_qr_code(frame)
         if dados_qr:
