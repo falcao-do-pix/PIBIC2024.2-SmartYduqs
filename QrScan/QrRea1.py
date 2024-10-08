@@ -1,7 +1,7 @@
 import cv2
 import datetime
 # initalize the cam
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture("http://192.168.137.160:81/stream")
 # initialize the cv2 QRCode detector
 detector = cv2.QRCodeDetector()
 while True:

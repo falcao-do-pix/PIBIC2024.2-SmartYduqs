@@ -95,7 +95,7 @@ def autenticar_aluno(dados_qr):
 # Função principal para capturar e processar QR Code
 def main():
     # Configurar captura de vídeo da câmera
-    cap = cv2.VideoCapture(0)  # 0 para a câmera padrão
+    cap = cv2.VideoCapture("http://192.168.137.20:81/stream")  # 0 para a câmera padrão
 
     while True:
         ret, frame = cap.read()
