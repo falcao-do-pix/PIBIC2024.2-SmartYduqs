@@ -77,11 +77,12 @@ def autenticar_e_gerar_qr(matricula, senha):
     except Exception as e:
         st.error(f"Erro ao autenticar: {e}")
 
-# Interface do Streamlit
-st.markdown("<h1 style='text-align: center; color: #4CAF50;'>Autenticação do Aluno e Geração de QR Code</h1>", unsafe_allow_html=True)
+# Função para exibir a interface de geração de QR code
+def mostrar_gerar_qr():
+    st.markdown("<h1 style='text-align: center; color: #4CAF50;'>Autenticação do Aluno e Geração de QR Code</h1>", unsafe_allow_html=True)
 
-matricula = st.text_input("Matrícula (12 caracteres):", max_chars=12, placeholder="Digite sua matrícula")
-senha = st.text_input("Senha:", type="password")
+    matricula = st.text_input("Matrícula (12 caracteres):", max_chars=12, placeholder="Digite sua matrícula")
+    senha = st.text_input("Senha:", type="password")
 
-if st.button("Gerar QR Code"):
-    autenticar_e_gerar_qr(matricula, senha)
+    if st.button("Gerar QR Code"):
+        autenticar_e_gerar_qr(matricula, senha)

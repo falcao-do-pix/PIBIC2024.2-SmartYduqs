@@ -1,14 +1,14 @@
 import cv2
 import numpy as np
+import streamlit as st
 from cryptography.fernet import Fernet
 import mysql.connector
 from mysql.connector import Error
-import re
+from PIL import Image
 
 # Função para conectar ao banco de dados MySQL
 def conectar():
     try:
-        print("Tentando conectar ao banco de dados...")
         conexao = mysql.connector.connect(
             host='localhost',
             database='smart_yduqs',
@@ -16,10 +16,9 @@ def conectar():
             password='Jkl73198246@'
         )
         if conexao.is_connected():
-            print("Conexão com o banco de dados bem-sucedida.")
             return conexao
     except Error as e:
-        print(f"Erro ao conectar ao MySQL: {e}")
+        st.error(f"Erro ao conectar ao MySQL: {e}")
         return None
 
 # Função para descriptografar a senha
@@ -27,105 +26,102 @@ def descriptografar_senha(senha_criptografada, chave):
     fernet = Fernet(chave)
     return fernet.decrypt(senha_criptografada).decode('utf-8')
 
-# Função para ler QR Code da imagem capturada
-def ler_qr_code(imagem):
-    print("Tentando ler o QR Code...")
+# Função para escanear o QR code e autenticar (adaptado para Streamlit)
+def autenticar_qr_code():
+    # Verificar se a variável de estado "parar" já foi inicializada
+    if "parar" not in st.session_state:
+        st.session_state.parar = False  # Inicializa o estado como False
+    
+    cap = cv2.VideoCapture(0)
     detector = cv2.QRCodeDetector()
-    data, bbox, _ = detector.detectAndDecode(imagem)
-    if bbox is not None:
-        print("QR Code detectado!")
-        return data
-    return None
 
-# Função para autenticar o aluno usando os dados do QR Code
-def autenticar_aluno(dados_qr):
-    try:
-        print(f"Tentando autenticar o aluno com os dados: {dados_qr}")
-        conexao = conectar()
-        if conexao:
-            cursor = conexao.cursor()
+    frameST = st.empty()  # Espaço reservado para o feed de vídeo
+    mensagem = st.empty()  # Espaço reservado para a mensagem de validação
 
-            # Extrair matrícula e senha criptografada do QR Code
-            try:
-                info = re.search(r'Matrícula: (\d+), Senha criptografada: (.+)', dados_qr)
-                if info:
-                    matricula = int(info.group(1))  # Converter matrícula para inteiro
-                    senha_criptografada_qr = info.group(2).encode()  # A senha do QR Code já vem como bytes
-                    print(f"Matrícula extraída: {matricula}")
-                else:
-                    print("Formato do QR Code inválido.")
-                    return
-            except Exception as e:
-                print(f"Erro ao processar dados do QR Code: {e}")
-                return
-
-            # Recuperar a chave de criptografia e a senha criptografada do banco de dados
-            query = "SELECT senha, chave_criptografia FROM alunos WHERE matricula = %s"
-            cursor.execute(query, (matricula,))
-            resultado = cursor.fetchone()
-
-            if resultado:
-                senha_criptografada_banco, chave_criptografia_banco = resultado
-
-                # Verificar se a chave já está em bytes
-                if isinstance(chave_criptografia_banco, str):
-                    chave_criptografia_banco = chave_criptografia_banco.encode()
-
-                # Descriptografar a senha do banco de dados
-                try:
-                    senha_descriptografada_banco = descriptografar_senha(senha_criptografada_banco, chave_criptografia_banco)
-
-                    # Comparar a senha descriptografada com a senha criptografada do QR Code
-                    if senha_criptografada_qr == senha_criptografada_banco:
-                        print("Acesso liberado!")
-                    else:
-                        print("Acesso negado: senha não confere.")
-                except Exception as e:
-                    print(f"Erro ao descriptografar senha: {e}")
-            else:
-                print(f"Matrícula {matricula} não encontrada no banco de dados.")
-        else:
-            print("Erro ao conectar ao banco de dados.")
-    except Exception as e:
-        print(f"Erro ao autenticar: {e}")
-
-# Função principal para capturar e processar QR Code
-def main():
-    esp32_url = 'http://192.168.137.183:81/stream'  # Substitua pelo IP da sua ESP32-CAM
-
-    # Configura captura de vídeo
-    cap = cv2.VideoCapture(esp32_url)  # Abre o feed da ESP32-CAM
-
-    if not cap.isOpened():
-        print("Erro ao abrir o stream da ESP32-CAM.")
-        return
-
-    while True:
+    # Laço para capturar o QR Code
+    while not st.session_state.parar:  # Mantém o loop enquanto o botão "Parar" não for clicado
         ret, frame = cap.read()
         if not ret:
-            print("Falha ao capturar frame.")
+            st.error("Erro ao acessar a câmera.")
             break
 
-        # Decodificar QR Code da imagem capturada
-        dados_qr = ler_qr_code(frame)
-        if dados_qr:
-            print(f"Dados do QR Code: {dados_qr}")
+        # Detectar e decodificar o QR code no frame
+        data, bbox, _ = detector.detectAndDecode(frame)
 
-            # Autenticar o aluno com os dados do QR Code
-            autenticar_aluno(dados_qr)
-            # Após autenticação, o loop continua para novas tentativas
+        if bbox is not None:  # Se houver um QR code detectado, desenhar bordas ao redor dele
+            bbox = bbox.astype(int)  # Convertendo para inteiros
+            for i in range(len(bbox)):
+                pt1 = tuple(bbox[i][0])
+                pt2 = tuple(bbox[(i + 1) % len(bbox)][0])
+                cv2.line(frame, pt1, pt2, color=(255, 0, 0), thickness=2)
 
-        # Mostrar o vídeo em uma janela
-        cv2.imshow('ESP32-CAM QR Code Scanner', frame)
+            if data:  # Se o QR code foi lido corretamente
+                matricula, senha_criptografada = processar_dados_qr(data)
+                
+                if matricula and senha_criptografada:
+                    resultado = autenticar_matricula(matricula, senha_criptografada)
+                    if resultado:
+                        mensagem.success(f"Autenticação bem-sucedida para a matrícula {matricula}.")
+                    else:
+                        mensagem.error("Autenticação falhou. Matrícula ou senha incorreta.")
+        
+        # Exibir o frame na interface
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img_pil = Image.fromarray(frame_rgb)
+        frameST.image(img_pil, channels="RGB")
 
-        # Sair do loop se a tecla 'q' for pressionada
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            print("Saindo do loop.")
-            break
-
-    # Libere a captura e feche as janelas
     cap.release()
     cv2.destroyAllWindows()
+
+# Função para processar os dados do QR code (split na matrícula e senha)
+def processar_dados_qr(data):
+    try:
+        dados = data.split(",")
+        matricula = dados[0].split(":")[1].strip()
+        senha_criptografada = bytes(dados[1].split(":")[1].strip(), 'utf-8')
+        return matricula, senha_criptografada
+    except Exception as e:
+        st.error(f"Erro ao processar QR Code: {e}")
+        return None, None
+
+# Função para autenticar a matrícula no banco de dados
+def autenticar_matricula(matricula, senha_criptografada):
+    conexao = conectar()
+    if conexao:
+        cursor = conexao.cursor()
+
+        # Recuperar os dados do aluno no banco
+        query = "SELECT chave_criptografia FROM alunos WHERE matricula = %s"
+        cursor.execute(query, (matricula,))
+        resultado = cursor.fetchone()
+
+        if resultado:
+            chave_criptografia_banco = resultado[0]  # Chave de criptografia (em bytes)
+
+            # Descriptografar a senha do QR code e comparar com a armazenada
+            senha_descriptografada = descriptografar_senha(senha_criptografada, chave_criptografia_banco)
+            if senha_descriptografada:
+                return True
+        else:
+            st.error("Matrícula não encontrada.")
+    return False
+
+# Função principal para exibir a interface do QR code
+def main():
+    st.title("Autenticação via QR Code")
+    st.write("Aponte o QR Code para a câmera para autenticar.")
+    
+    if st.button("Iniciar Captura", key="start_button"):
+        st.session_state.parar = False  # Resetar o estado parar ao iniciar a captura
+        autenticar_qr_code()
+
+    # Botão "Parar" com chave única fora do loop de captura
+    if st.button("Parar Captura", key="unique_stop_button"):
+        st.session_state.parar = True  # Alterar o estado para parar a captura
+
+    # Se o botão "Parar" foi clicado
+    if st.session_state.get("parar"):
+        st.success("Captura interrompida.")
 
 if __name__ == "__main__":
     main()

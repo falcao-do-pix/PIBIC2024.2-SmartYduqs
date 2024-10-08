@@ -15,7 +15,7 @@ def conectar():
         )
         if conexao.is_connected():
             return conexao
-    except Error as e: 
+    except Error as e:
         st.error(f"Erro ao conectar ao MySQL: {e}")
         return None
 
@@ -48,26 +48,25 @@ def cadastrar_aluno(conexao, matricula, nome, email, senha_criptografada, chave_
         if conexao.is_connected():
             cursor.close()
 
-# Interface do Streamlit
-# Exibe o logo no topo
-st.image("img1.png", width=200)
+# Função para exibir a interface de cadastro de alunos
+def mostrar_cadastro_aluno():
+    st.image("img1.png", width=200)
+    st.markdown("<h1 style='text-align: center; color: #4CAF50;'>Cadastro de Alunos</h1>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #4CAF50;'>Cadastro de Alunos</h1>", unsafe_allow_html=True)
+    matricula = st.text_input("Matrícula (12 caracteres):", max_chars=12, placeholder="Digite sua matrícula")
+    nome = st.text_input("Nome completo:")
+    email = st.text_input("Email:")
+    senha = st.text_input("Senha:", type="password", help="A senha deve conter pelo menos 8 caracteres...")
 
-matricula = st.text_input("Matrícula (12 caracteres):", max_chars=12, placeholder="Digite sua matrícula")
-nome = st.text_input("Nome completo:")
-email = st.text_input("Email:")
-senha = st.text_input("Senha:", type="password", help="A senha deve conter pelo menos 8 caracteres, incluindo uma letra maiúscula, um número e um símbolo especial.")
-
-if st.button("Cadastrar"):
-    if not (nome and email and matricula.isdigit() and len(matricula) == 12):
-        st.warning("Por favor, preencha todos os campos corretamente.")
-    elif not validar_senha(senha):
-        st.warning("A senha deve ter pelo menos 8 caracteres, incluindo uma letra maiúscula, um número e um símbolo especial.")
-    else:
-        conexao = conectar()
-        if conexao:
-            chave = Fernet.generate_key()
-            senha_criptografada = criptografar_senha(senha, chave)
-            cadastrar_aluno(conexao, matricula, nome, email, senha_criptografada, chave)
-            conexao.close()
+    if st.button("Cadastrar"):
+        if not (nome and email and matricula.isdigit() and len(matricula) == 12):
+            st.warning("Por favor, preencha todos os campos corretamente.")
+        elif not validar_senha(senha):
+            st.warning("A senha deve ter pelo menos 8 caracteres, incluindo uma letra maiúscula, um número e um símbolo especial.")
+        else:
+            conexao = conectar()
+            if conexao:
+                chave = Fernet.generate_key()
+                senha_criptografada = criptografar_senha(senha, chave)
+                cadastrar_aluno(conexao, matricula, nome, email, senha_criptografada, chave)
+                conexao.close()
