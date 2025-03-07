@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "941924811432",
+    "project_id": "smart-yduqs",
+    "storage_bucket": "smart-yduqs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:941924811432:android:10ee6e06dccb402e47389d",
+        "android_client_info": {
+          "package_name": "com.example.aluno_qr_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO92FqMu5tDZdf5hkslQHnxzqYQIIMDSI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
